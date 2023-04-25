@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <title>WebGL</title>
+</head>
+
+<body>
+     <canvas id="theCanvas" width="400" height="400">
+            Please use a browser that supports "canvas"
+        </canvas>
+
+        <p>Type: "r", "g", "b" or "w"</p>
+
+        <script id="vertexShader" type="x-shader/x-vertex">
+            uniform mat4 transform;
+            attribute vec4 a_Position;
+            attribute vec4 a_Color;
+            varying vec4 color;
+            void main()
+            {
+              color = a_Color;
+              gl_PointSize = 9.0;
+
+              gl_Position = transform * a_Position;
+            }
+        </script>
+
+        <script id="fragmentShader" type="x-shader/x-fragment">
+            // In a webgl fragment shader, float precision has to be specified before
+            // any other variable declarations (in this case, "medium" precision)
+            precision mediump float;
+            varying vec4 color;
+            void main()
+            {
+              gl_FragColor = color;
+            }
+        </script>
+    <script src="./utils/cuon-utils.js"></script>
+    <script src="./utils/cuon-matrix.js"></script>
+    <script src="RotatingSquare.js"></script>
+    <script>
+        window.onload = mainEntrance;
+    </script>
+</body>
+
+</html>
