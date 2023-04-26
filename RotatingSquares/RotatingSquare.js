@@ -125,6 +125,8 @@ var projectionMatrix = new Matrix4().setOrtho(-wsize / 2,
     0,
     1
 );
+var collisonMode =0;
+var currentScale=1;
 
 /**
  * Translate keydown events to strings
@@ -146,13 +148,18 @@ function getChar(event) {
  * @param {Number} tx translation from the transformed pivot vertex to its original position, in the x axis.
  * @param {Number} ty translation from the transformed pivot vertex to its original position, in the y axis.
  */
-function rotateAboutCorner(ang, x, y, tx, ty) {
-    modelMatrix.setTranslate(x, y, 0.0);
-    modelMatrix.rotate(ang, 0.0, 0.0, 1.0);
-    modelMatrix.translate(-x, -y, 0.0);
-    // unless clicked this is (0,0)
-    modelMatrix.translate(tx, ty, 0.0);
+function rotateAndScaleAboutCorner(ang, x, y, tx, ty) {
+  modelMatrix.setTranslate(x, y, 0.0);
+  modelMatrix.rotate(ang, 0.0, 0.0, 1.0);
+  modelMatrix.scale(currentScale, currentScale, 1);
+
+  modelMatrix.translate(-x, -y, 0.0);
+  // unless clicked this is (0,0)
+  modelMatrix.translate(tx, ty, 0.0);
 }
+
+
+
 
 /**
  * Handler for keydown events that will update {@link modelMatrix} based
@@ -162,24 +169,35 @@ function rotateAboutCorner(ang, x, y, tx, ty) {
 function handleKeyPress(event) {
     var ch = getChar(event);
     switch (ch) {
-        case "r":
-            console.log("r");
-            cindex = 0;
-            break;
-        case "g":
-            console.log("g");
-            cindex = 1;
-            break;
-        case "b":
-            console.log("b");
-            cindex = 2;
-            break;
-        case "w":
-            console.log("w");
-            cindex = 5;
-            break;
-        default:
-            return;
+      case "r":
+        console.log("r");
+        cindex = 0;
+        break;
+      case "g":
+        console.log("g");
+        cindex = 1;
+        break;
+      case "b":
+        console.log("b");
+        cindex = 2;
+        break;
+      case "w":
+        console.log("w");
+        cindex = 5;
+        break;
+      case "c":
+        collisonMode = collisonMode == 0 ? 1 : 0;
+        break;
+      case "+":
+        if(currentScale<2.5)
+        currentScale+=0.1;
+        break;
+      case "-":
+        if (currentScale > 0.5) currentScale -= 0.1;
+
+        break;
+      default:
+        return;
     }
     click = true;
 }
@@ -270,6 +288,7 @@ function printMatrix(matrix) {
     console.log(m[8], m[9], m[10], m[11]);
     console.log(m[12], m[13], m[14], m[15]);
 }
+
 
 /**
  * Entry point when page is loaded.
@@ -365,16 +384,78 @@ function mainEntrance() {
         // angle increment
         var increment = 2.0;
 
+
+        // 0-red , 1 -green , 2- blue , 5 white
+
         // current corner for rotation
         var corner = new Vector4([...getVertex(cindex), 0.0, 1.0]);
+        var cornersIndexes= [0,1,2,5];
 
-        /**
+        // Metodo para detectar colisão dos pontos
+        function detectColision()
+        {
+            let positions = [];
+            for(let i =0;i<4; i++)
+            {
+                positions.push(new Vector4([...getVertex(cornersIndexes[i]), 0.0, 1.0]));
+                positions[i]= modelMatrix.multiplyVector4(positions[i]);
+                let mypositon = positions[i].elements;
+                if (mypositon[0] < -wsize / 2 )
+                {
+                    processColision(cornersIndexes[i],mypositon,0);
+                }
+                else if(mypositon[0] > wsize / 2){
+                    processColision(cornersIndexes[i],mypositon,1);
+                }
+                else if(mypositon[1] < -wsize / 2){
+                    processColision(cornersIndexes[i],mypositon,3);
+                }
+                else if( mypositon[1] > wsize / 2)
+                {
+                    processColision(cornersIndexes[i],mypositon,2);
+                }
+            }
+        }
+        //Processa qual tipo de colisão dependendo da selecionada
+        //collisionType = 0 -left , 1- right , 2- up 3- down
+        function processColision(collidedIndex,collisionPosition,collisonType)
+        {
+            let translateMatrix = new Matrix4();
+            let fixammout=0.08
+
+            switch (collisonType) {
+              case 0:
+                translateMatrix.setTranslate(fixammout, 0, 0);
+                break;
+              case 1:
+                translateMatrix.setTranslate(-fixammout, 0, 0);
+                break;
+              case 2:
+                translateMatrix.setTranslate(0, -fixammout, 0);
+                break;
+              case 3:
+                translateMatrix.setTranslate(0, fixammout, 0);
+                break;
+            }
+            modelMatrix = translateMatrix.multiply(modelMatrix);
+            if(collisonMode==0)
+            {
+                increment*=-1;
+            }
+            else if(collisonMode==1)
+            {
+                cindex= collidedIndex;
+                click=true;
+            }
+        }
+        /**)
          * <p>Keep drawing frames.</p>
          * Request that the browser calls {@link runanimation} again "as soon as it can".
          * @callback loop
          * @see https://developer.mozilla.org/en-US/docs/Web/API/window/requestAnimationFrame
          */
         return () => {
+            detectColision();
             ang += increment;
             ang = ang % 360;
             if (click) {
@@ -384,11 +465,13 @@ function mainEntrance() {
                 corner = modelMatrix.multiplyVector4(corner);
                 tx = corner.elements[0] - vx;
                 ty = corner.elements[1] - vy;
+
                 click = false;
             }
-            rotateAboutCorner(ang, corner.elements[0], corner.elements[1], tx, ty);
-            //printMatrix(modelMatrix);
-            //console.log("  ");
+            rotateAndScaleAboutCorner(ang, corner.elements[0], corner.elements[1], tx, ty);
+
+
+
             draw();
 
             requestAnimationFrame(runanimation);
