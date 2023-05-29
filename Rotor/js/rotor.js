@@ -389,8 +389,21 @@ function handleKeyPress(event) {
       shaftMatrix.setTranslate(0, -5, 0).rotate(joint.turbine, 0, 1, 0);
       baseMatrix.setTranslate(0, -12.5, 0).rotate(joint.base, 0, 1, 0);
       generatorMatrix.setTranslate(0, 12, 0).rotate(joint.generator, 0, 1, 0);
-      d= rotator.getViewDistance()-1;
-      rotator.setViewDistance(d);
+
+      eye = [20, 20, 20];
+
+      viewMatrix = new Matrix4().setLookAt(
+        ...eye,     // eye
+        0, 0, 0,    // at - looking at the origin
+        0, 1, 0     // up vector - y axis
+      );
+      var viewDistance = vecLen(eye);
+      rotator.setViewMatrix(viewMatrix.elements);
+      rotator.setViewDistance(viewDistance);
+
+
+
+
     case "ArrowUp":
       // Up pressed
       d = rotator.getViewDistance();
