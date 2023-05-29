@@ -55,66 +55,45 @@ var lightingShader;
  * @type {Object<{String:Number}>}
  */
 var joint = {
-  torso: 0.0,
-  shoulder: 45.0,
-  arm: 45.0,
-  hand: 0.0,
-  head: 0.0,
+  blade:0,
+  generator:0,
+  turbine:45,
+  base:0
 };
 
-/**
- * Transformation matrix that is the root of 5 objects in the scene.
- * @type {Matrix4}
- */
-var torsoMatrix = new Matrix4()
-  .setTranslate(0, 0, 0)
-  .rotate(joint.torso, 0, 1, 0);
 
-/**  @type {Matrix4} */
-var shoulderMatrix = new Matrix4()
-  .setTranslate(6.5, 2, 0)
-  .translate(0, 2, 0)
-  .rotate(-joint.shoulder, 1, 0, 0)
-  .translate(0, -2, 0);
+//Rotator matrixes
 
-/**  @type {Matrix4} */
-var armMatrix = new Matrix4()
-  .setTranslate(0, -5, 0)
-  .translate(0, 2.5, 1.0)
-  .rotate(-joint.arm, 1, 0, 0)
-  .translate(0, -2.5, -1.0);
-
-/**  @type {Matrix4} */
-var handMatrix = new Matrix4()
-  .setTranslate(0, -4, 0)
-  .rotate(joint.hand, 0, 1, 0);
-
-/**  @type {Matrix4} */
-var headMatrix = new Matrix4()
-  .setTranslate(0, 7, 0)
-  .rotate(joint.head, 0, 1, 0);
-
-var torsoMatrixLocal = new Matrix4().setScale(10, 10, 5);
-var shoulderMatrixLocal = new Matrix4().setScale(3, 5, 2);
-var armMatrixLocal = new Matrix4().setScale(3, 5, 2);
-var handMatrixLocal = new Matrix4().setScale(1, 3, 3);
-var headMatrixLocal = new Matrix4().setScale(4, 4, 4);
-
-var shaftMatrix = new Matrix4()
-  .setTranslate(0, -5, 0)
-  .rotate(joint.torso, 0, 1, 0);
-
-/**  @type {Matrix4} */
-var baseMatrix = new Matrix4()
-  .setTranslate(0, -17.5, 0)
-  .translate(0, 2, 0)
-  .rotate(-joint.shoulder, 1, 0, 0)
-  .translate(0, -2, 0);
+var shaftMatrix = new Matrix4().setTranslate(0, -5, 0).rotate(joint.turbine,0,1,0);
+var baseMatrix = new Matrix4().setTranslate(0, -12.5, 0).rotate(joint.base,0,1,0);
+var generatorMatrix = new Matrix4().setTranslate(0, 12, 0).rotate(joint.generator,0,1,0);
+var generatorBlobMatrix = new Matrix4().setTranslate(0, 2, 0);
+var rotorDummyMatrix = new Matrix4().setTranslate(0, 0, 3.2);
+var rotorMatrix = new Matrix4().setTranslate(0, 0, 0.3);
+var rotorBlobMatrix = new Matrix4().setTranslate(0, 0, 0.5);
+var rotorBladeMatrix = new Matrix4().setTranslate(0, 0,0 );
 
 
 var shaftMatrixLocal = new Matrix4().setScale(2, 25, 2);
 var baseMatrixLocal = new Matrix4().setScale(6, 0.5, 6);
+var generatorMatrixLocal = new Matrix4().setScale(4, 3, 6);
+var generatorBlobMatrixLocal = new Matrix4().setScale(2.5, 1, 4);
+var rotorDummyMatrixLocal = new Matrix4().setScale(0.4,0.4,0.4);
+var rotorMatrixLocal = new Matrix4().setScale(1.5,1.5,1);
+var rotorBlobLocal = new Matrix4().setScale(0.5, 0.5, 0.5);
+var rotorBladeLocal = new Matrix4().setScale(1, 20, 0.3);
 
+
+//Control Variables
+var bladeAnimation=true;
+var bladeSpeed=6;
+var bladeDirection= 1;
+
+/**
+ * Camera position.
+ * @type {Array<Number>}
+ */
+var eye = [20, 20, 20];
 
 /**
  * View matrix.
@@ -122,7 +101,7 @@ var baseMatrixLocal = new Matrix4().setScale(6, 0.5, 6);
  */
 // prettier-ignore
 var viewMatrix = new Matrix4().setLookAt(
-  20, 20, 20, // eye
+  ...eye,     // eye
   0, 0, 0,    // at - looking at the origin
   0, 1, 0     // up vector - y axis
 );
@@ -134,11 +113,32 @@ var viewMatrix = new Matrix4().setLookAt(
 var modelMatrix = new Matrix4();
 
 /**
+ * Returns the magnitude (length) of a vector.
+ * @param {Array<Number>} v n-D vector.
+ * @returns {Number} vector length.
+ * @see https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Array/Reduce
+ */
+var vecLen = (v) =>
+  Math.sqrt(v.reduce((accumulator, value) => accumulator + value * value, 0));
+
+/**
+ * View distance.
+ * @type {Number}
+ */
+var viewDistance = vecLen(eye);
+
+/**
  * <p>Projection matrix.</p>
  * Here use aspect ratio 3/2 corresponding to canvas size 600 x 400.
  * @type {Matrix4}
  */
 var projection = new Matrix4().setPerspective(45, 1.5, 0.1, 1000);
+
+/**
+ * Object to enable rotation by mouse dragging (arcball).
+ * @type {SimpleRotator}
+ */
+var rotator;
 
 /**
  * A very basic stack class,
@@ -170,7 +170,7 @@ class Stack {
    * @return {Matrix4} m transformation matrix.
    */
   top() {
-    if (this.t <= 0) {
+    if (this.t < 0) {
       console.log("top = ", this.t);
       console.log("Warning: stack underflow");
     } else {
@@ -227,12 +227,12 @@ var cube = (() => {
 
   // prettier-ignore
   var rawColors = new Float32Array([
-      1.0, 0.0, 0.0, 1.0,  // red
-      0.0, 1.0, 0.0, 1.0,  // green
-      0.0, 0.0, 1.0, 1.0,  // blue
-      1.0, 1.0, 0.0, 1.0,  // yellow
-      1.0, 0.0, 1.0, 1.0,  // magenta
-      0.0, 1.0, 1.0, 1.0,  // cyan
+      1.0, 0.0, 0.0, 1.0,
+      1.0, 0.0, 0.0, 1.0,
+      1.0, 0.0, 0.0, 1.0,
+      1.0, 0.0, 0.0, 1.0,
+      0, 0, 0, 1,  // magenta
+      0, 0, 0, 1,  // cyan
     ]);
 
   // prettier-ignore
@@ -337,70 +337,76 @@ function getChar(event) {
  */
 function handleKeyPress(event) {
   var ch = getChar(event);
+  var d;
   let opt = document.getElementById("options");
   switch (ch) {
-    case "t":
-      joint.torso += 15;
-      torsoMatrix.setTranslate(0, 0, 0).rotate(joint.torso, 0, 1, 0);
+    case "r":
+      bladeDirection = bladeDirection = -1;
       break;
-    case "T":
-      joint.torso -= 15;
-      torsoMatrix.setTranslate(0, 0, 0).rotate(joint.torso, 0, 1, 0);
+    case "R":
+      bladeDirection = bladeDirection = 1;
       break;
     case "s":
-      joint.shoulder += 15;
-      // rotate shoulder clockwise about a point 2 units above its center
-      var currentShoulderRot = new Matrix4()
-        .setTranslate(0, 2, 0)
-        .rotate(-joint.shoulder, 1, 0, 0)
-        .translate(0, -2, 0);
-      shoulderMatrix.setTranslate(6.5, 2, 0).multiply(currentShoulderRot);
+      bladeSpeed = bladeSpeed - 1 < 2 ? 2 : bladeSpeed - 1;
       break;
     case "S":
-      joint.shoulder -= 15;
-      var currentShoulderRot = new Matrix4()
-        .setTranslate(0, 2, 0)
-        .rotate(-joint.shoulder, 1, 0, 0)
-        .translate(0, -2, 0);
-      shoulderMatrix.setTranslate(6.5, 2, 0).multiply(currentShoulderRot);
+      bladeSpeed = bladeSpeed + 1 > 15 ? 15 : bladeSpeed + 1;
       break;
     case "a":
-      joint.arm += 15;
-      // rotate arm clockwise about its top front corner
-      var currentArm = new Matrix4()
-        .setTranslate(0, 2.5, 1.0)
-        .rotate(-joint.arm, 1, 0, 0)
-        .translate(0, -2.5, -1.0);
-      armMatrix.setTranslate(0, -5, 0).multiply(currentArm);
+      bladeAnimation = !bladeAnimation;
       break;
-    case "A":
-      joint.arm -= 15;
-      var currentArm = new Matrix4()
-        .setTranslate(0, 2.5, 1.0)
-        .rotate(-joint.arm, 1, 0, 0)
-        .translate(0, -2.5, -1.0);
-      armMatrix.setTranslate(0, -5, 0).multiply(currentArm);
+    case "G":
+      joint.generator += 10;
+      generatorMatrix.setTranslate(0, 12, 0).rotate(joint.generator, 0, 1, 0);
       break;
-    case "h":
-      joint.hand += 15;
-      handMatrix.setTranslate(0, -4, 0).rotate(joint.hand, 0, 1, 0);
+    case "g":
+      joint.generator -= 10;
+      generatorMatrix.setTranslate(0, 12, 0).rotate(joint.generator, 0, 1, 0);
       break;
-    case "H":
-      joint.hand -= 15;
-      handMatrix.setTranslate(0, -4, 0).rotate(joint.hand, 0, 1, 0);
+    case "T":
+      joint.turbine += 10;
+      shaftMatrix.setTranslate(0, -5, 0).rotate(joint.turbine, 0, 1, 0);
       break;
-    case "l":
-      joint.head += 15;
-      headMatrix.setTranslate(0, 7, 0).rotate(joint.head, 0, 1, 0);
+    case "t":
+      joint.turbine -= 10;
+      shaftMatrix.setTranslate(0, -5, 0).rotate(joint.turbine, 0, 1, 0);
       break;
-    case "L":
-      joint.head -= 15;
-      headMatrix.setTranslate(0, 7, 0).rotate(joint.head, 0, 1, 0);
+    case "B":
+      joint.base += 10;
+      baseMatrix.setTranslate(0, -12.5, 0).rotate(joint.base, 0, 1, 0);
       break;
+    case "b":
+      joint.base -= 10;
+      baseMatrix.setTranslate(0, -12.5, 0).rotate(joint.base, 0, 1, 0);
+      break;
+    case "o":
+      joint = {
+        blade: joint.blade,
+        generator: 0,
+        turbine: 45,
+        base: 0,
+      };
+      shaftMatrix.setTranslate(0, -5, 0).rotate(joint.turbine, 0, 1, 0);
+      baseMatrix.setTranslate(0, -12.5, 0).rotate(joint.base, 0, 1, 0);
+      generatorMatrix.setTranslate(0, 12, 0).rotate(joint.generator, 0, 1, 0);
+      d= rotator.getViewDistance()-1;
+      rotator.setViewDistance(d);
+    case "ArrowUp":
+      // Up pressed
+      d = rotator.getViewDistance();
+      d = Math.min(d + 1, 90);
+      rotator.setViewDistance(d);
+      break;
+    case "ArrowDown":
+      // Down pressed
+      d = rotator.getViewDistance();
+      d = Math.max(d - 1, 20);
+      rotator.setViewDistance(d);
+      break;
+
     default:
       return;
   }
-  draw();
 
   opt.innerHTML = `<br>${gl.getParameter(
     gl.SHADING_LANGUAGE_VERSION
@@ -483,39 +489,57 @@ function renderCube(matrixStack, matrixLocal) {
  * <p>Code to actually render our geometry.</p>
  * @param {Boolean} useRotator whether a {@link SimpleRotator} should be used.
  */
+//Updates contents before draw
+function update()
+{
+	if (bladeAnimation) {
+		joint.blade += bladeSpeed*bladeDirection;
+		rotorDummyMatrix.setTranslate(0, 0, 3.2).rotate(joint.blade, 0, 0);
+	}
+
+
+}
 function draw(useRotator = true) {
   // clear the framebuffer
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-  // set up the matrix stack
+  if (useRotator) viewMatrix.elements = rotator.getViewMatrix();
+
+
   var s = new Stack();
-  s.push(torsoMatrix);
-  //renderCube(s, torsoMatrixLocal);
 
-  // shoulder relative to torso
-  s.push(new Matrix4(s.top()).multiply(shoulderMatrix));
-  //renderCube(s, shoulderMatrixLocal);
+  s.push(new Matrix4(s.top()).multiply(shaftMatrix));
+  renderCube(s, shaftMatrixLocal);
 
-  // arm relative to shoulder
-  s.push(new Matrix4(s.top()).multiply(armMatrix));
-  //renderCube(s, armMatrixLocal);
+  s.push(new Matrix4(s.top()).multiply(generatorMatrix));
+  renderCube(s, generatorMatrixLocal);
 
-  // hand relative to arm
-  s.push(new Matrix4(s.top()).multiply(handMatrix));
-  //renderCube(s, handMatrixLocal);
+  s.push(new Matrix4(s.top()).multiply(rotorDummyMatrix));
+  renderCube(s, rotorDummyMatrixLocal);
+
+  s.push(new Matrix4(s.top()).multiply(rotorMatrix));
+  renderCube(s, rotorMatrixLocal);
+
+  s.push(new Matrix4(s.top()).multiply(rotorBladeMatrix));
+  renderCube(s, rotorBladeLocal);
+
+  s.push(new Matrix4(s.top()).multiply(rotorBlobMatrix));
+  renderCube(s, rotorBlobLocal);
   s.pop();
   s.pop();
   s.pop();
+  s.pop();
 
-  // head relative to torso
-  s.push(new Matrix4(s.top()).multiply(headMatrix));
-  //renderCube(s, headMatrixLocal);
+  s.push(new Matrix4(s.top()).multiply(generatorBlobMatrix));
+  renderCube(s, generatorBlobMatrixLocal);
   s.pop();
   s.pop();
 
-  renderCube(s,shaftMatrixLocal);
-
-  renderCube(s,baseMatrixLocal);
+  //base Relative to shaft
+  s.push(new Matrix4(s.top().multiply(baseMatrix)));
+  renderCube(s, baseMatrixLocal);
+  s.pop();
+  s.pop();
 
   if (!s.isEmpty()) {
     console.log("Warning: pops do not match pushes");
@@ -623,13 +647,19 @@ window.addEventListener("load", (event) => {
     1000
   );
 
+  // create new rotator object
+  rotator = new SimpleRotator(canvas, draw);
+  rotator.setViewMatrix(viewMatrix.elements);
+  rotator.setViewDistance(viewDistance);
+
   /**
    * <p>Define an animation loop.</p>
    * Start drawing!
    * @callback animate
    */
   (function animate() {
+	update();
     draw();
-    // requestAnimationFrame(animate);
+    requestAnimationFrame(animate);
   })();
 });

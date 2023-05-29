@@ -6,7 +6,7 @@ Vertex shader does basic Lambert shading. -->
     <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Rotor Hierarchy</title>
+        <title>Super Rotor</title>
     </head>
 
     <body>
@@ -16,18 +16,23 @@ Vertex shader does basic Lambert shading. -->
 
         <br />
         <details>
-            <summary style="font-size: 120%">
-                Keyboard controls (drag on the object to rotate it):
-            </summary>
+            <summary style="font-size: 120%">Keyboard controls:</summary>
 
             <ul style="list-style: none">
-                <li>space - pause/resume animation</li>
-                <li>t, T - rotate turbine</li>
-                <li>g, G - rotate generator</li>
-                <li>r, R - rotor direction (clockwise/counter-clockwise)</li>
-                <li>b, B - blade pitch (affects rotor rotation speed)</li>
-                <li>o - reset rotation</li>
-                <li>↑,↓ - Zoom out/in</li>
+
+                <li>t, T - Rotate Turbine</li>
+                <li>g,G - Rotate Generator</li>
+                <li>b,B - Rotate Base</li>
+
+                <li>s,S - Blade Speed</li>
+                <li>r,R - Blade Direction</li>
+                <li> a - start/stop Blade Animation</li>
+
+                <li> o - Reset rotation</li>
+
+                <li id="options"></li>
+                <li> Desenvolvido por - Nathan Vieira De Magalhães</li>
+
             </ul>
         </details>
 
@@ -45,7 +50,7 @@ Vertex shader does basic Lambert shading. -->
 
             varying vec4 color;
             void main() {
-                float ambientFactor = 0.1;
+                float ambientFactor = 0.2;
                 float kd = 0.7;
                 // light at the viewer
                 vec3 lightDirection = normalize((-view * model * a_Position).xyz);
@@ -53,6 +58,7 @@ Vertex shader does basic Lambert shading. -->
                 // vec3 lightDirection = normalize((view * lightPosition - view * model * a_Position).xyz);
                 vec3 normal = normalize(normalMatrix * a_Normal);
                 float diffuseFactor = max(0.0, dot(lightDirection, normal));
+                // it can be used u_Color for a uniform color for the whole cube
                 color = a_Color * kd * diffuseFactor + a_Color * ambientFactor;
                 color.a = 1.0;
                 gl_Position = projection * view * model * a_Position;
@@ -62,15 +68,14 @@ Vertex shader does basic Lambert shading. -->
         <script id="fragmentLightingShader" type="x-shader/x-fragment">
             precision mediump float;
             varying vec4 color;
-            void main()
-            {
-              gl_FragColor = color;
+            void main() {
+                gl_FragColor = color;
             }
         </script>
 
-         <script src="js/cuon-utils.js"></script>
+        <script src="js/cuon-utils.js"></script>
         <script src="js/cuon-matrix.js"></script>
         <script src="js/simple-rotator.js"></script>
-        <script type="module" src="HierarchyWithTree4.js"></script>
+        <script src="js/rotor.js"></script>
     </body>
 </html>
